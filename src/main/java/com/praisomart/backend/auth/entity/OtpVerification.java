@@ -1,13 +1,13 @@
 package com.praisomart.backend.auth.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "otp_verification", schema = "paisomart_auth")
-@Data
+
 public class OtpVerification {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -30,6 +30,19 @@ public class OtpVerification {
         this.createdAt=LocalDateTime.now();
         this.expiryTime = LocalDateTime.now().plusMinutes(5);
         this.verified = false;
+    }
+
+    public OtpVerification() {
+    }
+
+    public OtpVerification(LocalDateTime createdAt, LocalDateTime expiryTime, Long id, String identifier, String otpCode, String otpType, boolean verified) {
+        this.createdAt = createdAt;
+        this.expiryTime = expiryTime;
+        this.id = id;
+        this.identifier = identifier;
+        this.otpCode = otpCode;
+        this.otpType = otpType;
+        this.verified = verified;
     }
 
     public LocalDateTime getCreatedAt() {

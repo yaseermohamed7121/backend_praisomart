@@ -1,8 +1,5 @@
 package com.praisomart.backend.auth.dto;
 
-import lombok.Data;
-
-@Data
 public class OtpVerifyResponseDTO {
 
     private String message;
@@ -11,5 +8,11 @@ public class OtpVerifyResponseDTO {
         this.message = message;
     }
 
+    public String getMessage() {
+        return message;
+    }
 
+    public void setMessage(String message) {
+        this.message = message;
+    }
 }

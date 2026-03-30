@@ -41,6 +41,11 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+//    @PostMapping("/login")
+//    public String test() {
+//        return "Working";
+//    }
+
     // register
     @PostMapping("/register")
     public ResponseEntity<RegisterResponseDTO> register(

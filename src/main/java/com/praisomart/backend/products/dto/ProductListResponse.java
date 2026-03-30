@@ -1,7 +1,6 @@
 package com.praisomart.backend.products.dto;
-import lombok.Data;
 
-@Data
+
 public class ProductListResponse {
 
     private Long id;
@@ -20,6 +19,9 @@ public class ProductListResponse {
         this.image = image;
         this.price = price;
         this.inStock = inStock;
+    }
+
+    public ProductListResponse() {
     }
 
     // Getters & Setters

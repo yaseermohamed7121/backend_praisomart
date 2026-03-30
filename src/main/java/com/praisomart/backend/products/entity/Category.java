@@ -1,7 +1,7 @@
 package com.praisomart.backend.products.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -9,11 +9,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "categories")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+
 public class Category {
 
     @Id
@@ -34,6 +30,19 @@ public class Category {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    public Category(LocalDateTime createdAt, String description, Long id, String imageUrl, Boolean isActive, String name, LocalDateTime updatedAt) {
+        this.createdAt = createdAt;
+        this.description = description;
+        this.id = id;
+        this.imageUrl = imageUrl;
+        this.isActive = isActive;
+        this.name = name;
+        this.updatedAt = updatedAt;
+    }
+
+    public Category() {
+    }
 
     public LocalDateTime getCreatedAt() {
         return createdAt;

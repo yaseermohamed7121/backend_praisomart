@@ -3,9 +3,7 @@ package com.praisomart.backend.auth.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.Data;
 
-@Data
 public class RegisterRequestDTO {
     @NotBlank(message = "enter name")
     private String name;
@@ -18,6 +16,17 @@ public class RegisterRequestDTO {
     private String password;
     @NotBlank(message ="Enter password to continue")
     private String confirmPassword;
+
+    public RegisterRequestDTO(String confirmPassword, String email, String name, String password, String phoneNumber) {
+        this.confirmPassword = confirmPassword;
+        this.email = email;
+        this.name = name;
+        this.password = password;
+        this.phoneNumber = phoneNumber;
+    }
+
+    public RegisterRequestDTO() {
+    }
 
     public String getConfirmPassword() {
         return confirmPassword;

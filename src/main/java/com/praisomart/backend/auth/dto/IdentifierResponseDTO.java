@@ -1,8 +1,6 @@
 package com.praisomart.backend.auth.dto;
 
-import lombok.Data;
 
-@Data
 public class IdentifierResponseDTO {
 
     private boolean exists;
@@ -13,4 +11,22 @@ public class IdentifierResponseDTO {
         this.message=message;
     }
 
+    public IdentifierResponseDTO() {
+    }
+
+    public boolean isExists() {
+        return exists;
+    }
+
+    public void setExists(boolean exists) {
+        this.exists = exists;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
 }

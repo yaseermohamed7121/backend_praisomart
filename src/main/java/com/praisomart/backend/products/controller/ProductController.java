@@ -3,7 +3,7 @@ package com.praisomart.backend.products.controller;
 import com.praisomart.backend.products.dto.ProductDetailResponse;
 import com.praisomart.backend.products.dto.ProductListResponse;
 import com.praisomart.backend.products.service.ProductService;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

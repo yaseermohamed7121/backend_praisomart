@@ -1,12 +1,17 @@
 package com.praisomart.backend.auth.dto;
 
-import lombok.Data;
-
-@Data
 public class LoginRequestDTO {
 
     private String identifier;
     private String password;
+
+    public LoginRequestDTO(String identifier, String password) {
+        this.identifier = identifier;
+        this.password = password;
+    }
+
+    public LoginRequestDTO() {
+    }
 
     public String getIdentifier() {
         return identifier;

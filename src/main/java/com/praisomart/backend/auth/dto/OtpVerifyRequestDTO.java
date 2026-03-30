@@ -4,6 +4,14 @@ public class OtpVerifyRequestDTO {
     private String identifier;
     private String otp;
 
+    public OtpVerifyRequestDTO() {
+    }
+
+    public OtpVerifyRequestDTO(String identifier, String otp) {
+        this.identifier = identifier;
+        this.otp = otp;
+    }
+
     public String getIdentifier() {
         return identifier;
     }

@@ -3,12 +3,12 @@ package com.praisomart.backend.auth.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
-import lombok.Data;
+
 
 import java.time.LocalDateTime;
 
 @Entity
-@Data
+
 @Table(name = "users", schema = "paisomart_auth")
 public class User {
 
@@ -40,6 +40,19 @@ public class User {
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.role="User";
+    }
+
+    public User(LocalDateTime createdAt, String email, Long id, String name, String password, String phoneNumber, String role) {
+        this.createdAt = createdAt;
+        this.email = email;
+        this.id = id;
+        this.name = name;
+        this.password = password;
+        this.phoneNumber = phoneNumber;
+        this.role = role;
+    }
+
+    public User() {
     }
 
     public LocalDateTime getCreatedAt() {

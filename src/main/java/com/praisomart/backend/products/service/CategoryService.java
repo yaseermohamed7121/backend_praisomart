@@ -2,7 +2,6 @@ package com.praisomart.backend.products.service;
 
 import com.praisomart.backend.products.dto.CategoryResponseDTO;
 import com.praisomart.backend.products.repository.CategoryRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

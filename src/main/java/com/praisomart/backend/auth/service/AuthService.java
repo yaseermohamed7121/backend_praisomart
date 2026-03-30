@@ -6,6 +6,8 @@ import com.praisomart.backend.auth.entity.User;
 import com.praisomart.backend.auth.repository.OtpVerificationRepository;
 import com.praisomart.backend.auth.repository.UserRepository;
 import com.praisomart.backend.auth.security.JwtUtil;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -21,15 +23,18 @@ public class AuthService {
     private final OtpVerificationRepository otpRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final AuthenticationManager authenticationManager;
 
     public AuthService(UserRepository userRepository,
                        OtpVerificationRepository otpRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtUtil jwtUtil) {
+                       JwtUtil jwtUtil,
+                       AuthenticationManager authenticationManager) {
         this.userRepository = userRepository;
         this.otpRepository = otpRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil=jwtUtil;
+        this.authenticationManager=authenticationManager;
     }
 
     // ------------------------------------------------
@@ -57,7 +62,6 @@ public class AuthService {
         else{
             return new IdentifierResponseDTO(false,"Enter valid email or phone number");
         }
-
         if(user.isPresent()){
             return new IdentifierResponseDTO(true,"login");
         }
@@ -180,36 +184,33 @@ public class AuthService {
     // ------------------------------------------------
     // LOGIN
     // ------------------------------------------------
-    public LoginResponseDTO login(LoginRequestDTO request){
+    public LoginResponseDTO login(LoginRequestDTO request) {
 
-        Optional<User> user;
+        // Step 1: Find user (email OR phone)
+        User user = userRepository.findByEmail(request.getIdentifier())
+                .or(() -> userRepository.findByPhoneNumber(request.getIdentifier()))
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if(request.getIdentifier().matches("^[0-9]{10}$")){
-            user = userRepository.findByPhoneNumber(request.getIdentifier());
-        }
-        else{
-            user = userRepository.findByEmail(request.getIdentifier());
-        }
-
-        if(user.isEmpty()){
-            return new LoginResponseDTO("User not found");
-        }
-
-        User existingUser = user.get();
-
-        if(!passwordEncoder.matches(request.getPassword(), existingUser.getPassword())){
-            return new LoginResponseDTO("Invalid password");
-        }
-
-        // JWT generation later
-        String token = jwtUtil.generateToken(
-                existingUser.getId(),
-                existingUser.getEmail(),
-                List.of(existingUser.getRole())
+        // Step 2: Authenticate
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        user.getEmail(),   // always email
+                        request.getPassword()
+                )
         );
 
+        // Step 3: Generate JWT
+        String token = jwtUtil.generateToken(
+                user.getId(),
+                user.getEmail(),
+                List.of(user.getRole())
+        );
 
-        return new LoginResponseDTO("Login successful", token);
+        // Step 4: Response
+        return new LoginResponseDTO(
+                token,
+                "Login Successful"
+        );
     }
 
 }

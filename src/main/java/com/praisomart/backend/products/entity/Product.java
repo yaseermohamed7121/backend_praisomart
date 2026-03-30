@@ -1,14 +1,14 @@
 package com.praisomart.backend.products.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "products",
         uniqueConstraints = @UniqueConstraint(columnNames = {"name", "color", "category_id"}))
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+
 public class Product {
 
     @Id
@@ -30,10 +30,24 @@ public class Product {
     private Category category;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProductVariant> variants;
+    private Set<ProductVariant> variants;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProductImage> images;
+    private Set<ProductImage> images;
+
+    public Product(Category category, String color, String description, Long id, Set<ProductImage> images, Boolean isActive, String name, Set<ProductVariant> variants) {
+        this.category = category;
+        this.color = color;
+        this.description = description;
+        this.id = id;
+        this.images = images;
+        this.isActive = isActive;
+        this.name = name;
+        this.variants = variants;
+    }
+
+    public Product() {
+    }
 
     public Category getCategory() {
         return category;
@@ -67,11 +81,11 @@ public class Product {
         this.id = id;
     }
 
-    public List<ProductImage> getImages() {
+    public Set<ProductImage> getImages() {
         return images;
     }
 
-    public void setImages(List<ProductImage> images) {
+    public void setImages(Set<ProductImage> images) {
         this.images = images;
     }
 
@@ -91,11 +105,11 @@ public class Product {
         this.name = name;
     }
 
-    public List<ProductVariant> getVariants() {
+    public Set<ProductVariant> getVariants() {
         return variants;
     }
 
-    public void setVariants(List<ProductVariant> variants) {
+    public void setVariants(Set<ProductVariant> variants) {
         this.variants = variants;
     }
 }

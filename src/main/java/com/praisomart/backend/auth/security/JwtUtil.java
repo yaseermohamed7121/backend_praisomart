@@ -4,6 +4,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
@@ -18,12 +19,13 @@ public class JwtUtil {
     private String secret;
 
     @Value("${jwt.expiration}")
-    private long expiration; // in ms
+    private long expiration;
 
     private Key getSigningKey() {
         return Keys.hmacShaKeyFor(secret.getBytes());
     }
 
+    // ✅ Token Generation
     public String generateToken(Long userId, String username, List<String> roles) {
         return Jwts.builder()
                 .setSubject(username)
@@ -35,6 +37,7 @@ public class JwtUtil {
                 .compact();
     }
 
+    // ✅ Extract all claims
     public Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())
@@ -47,9 +50,30 @@ public class JwtUtil {
         return extractAllClaims(token).getSubject();
     }
 
+    public Long extractUserId(String token) {
+        return extractAllClaims(token).get("userId", Long.class);
+    }
+
+    // 🔥 SAFE ROLE EXTRACTION
+    public List<String> extractRoles(String token) {
+        List<?> roles = extractAllClaims(token).get("roles", List.class);
+        return roles.stream().map(Object::toString).toList();
+    }
+
+    // 🔥 NEW: Convert roles → authorities
+    public List<SimpleGrantedAuthority> extractAuthorities(String token) {
+        return extractRoles(token).stream()
+                .map(SimpleGrantedAuthority::new)
+                .toList();
+    }
+
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        try {
+            String username = extractUsername(token);
+            return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private boolean isTokenExpired(String token) {

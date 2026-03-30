@@ -6,7 +6,7 @@ import com.praisomart.backend.products.dto.VariantResponse;
 import com.praisomart.backend.products.entity.Product;
 import com.praisomart.backend.products.entity.ProductImage;
 import com.praisomart.backend.products.repository.ProductRepository;
-import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,14 +21,15 @@ public class ProductService {
         this.productRepository=productRepository;
     }
 
-    // ✅ PRODUCT LIST (Category + Explore All)
+    // PRODUCT LIST (Category + Explore All)
     public List<ProductListResponse> getProducts(Long categoryId) {
+
 
         return productRepository.findProducts(categoryId)
                 .stream()
                 .map(p -> {
 
-                    // ✅ FIXED HERE (getPrimary())
+                    // FIXED HERE (getPrimary())
                     String image = p.getImages().stream()
                             .filter(img -> Boolean.TRUE.equals(img.getPrimary()))
                             .findFirst()
@@ -54,7 +55,7 @@ public class ProductService {
                 }).toList();
     }
 
-    // ✅ PRODUCT DETAIL API
+    // PRODUCT DETAIL API
     public ProductDetailResponse getProductDetail(Long id) {
 
         Product p = productRepository.findProductDetail(id)
@@ -83,4 +84,5 @@ public class ProductService {
                 variants
         );
     }
+
 }
