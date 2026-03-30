@@ -115,59 +115,60 @@ public class CartService {
     @Transactional
     public AddCartItemResponseDTO addItem(Long userId, AddCartItemRequestDTO dto) {
 
-        // Get or create cart
+        // 1. Get or create cart
         Cart cart = cartRepository.findByUserIdAndIsActiveTrue(userId)
-                .orElseGet(() -> {
-                    Cart newCart = new Cart(userId);
-                    return cartRepository.save(newCart);
-                });
+                .orElseGet(() -> cartRepository.save(new Cart(userId)));
 
-        // Get product variant
+        // 2. Get product variant
         ProductVariant variant = productVariantRepository.findById(dto.getProductVariantId())
                 .orElseThrow(() -> new RuntimeException("Product variant not found"));
 
         int requestedQty = dto.getQuantity();
         int availableStock = variant.getStock();
 
-        // Check existing cart item
+        // 3. Find item (IMPORTANT: no isActive filter)
         CartItem cartItem = cartItemRepository
-                .findByCartIdAndProductVariantIdAndIsActiveTrue(cart.getId(), dto.getProductVariantId())
+                .findByCartIdAndProductVariantId(cart.getId(), dto.getProductVariantId())
                 .orElse(null);
 
         int finalQty;
 
         if (cartItem != null) {
-            int newQty = cartItem.getQuantity() + requestedQty;
 
-            if (newQty > availableStock) {
-                finalQty = availableStock;
+            // CASE 1: Item was deleted earlier → Reactivate
+            if (!cartItem.getIsActive()) {
+                cartItem.setIsActive(true);
+
+                finalQty = Math.min(requestedQty, availableStock);
+                cartItem.setQuantity(finalQty);
+
             } else {
-                finalQty = newQty;
-            }
+                // CASE 2: Already exists → Increase quantity
+                int newQty = cartItem.getQuantity() + requestedQty;
+                finalQty = Math.min(newQty, availableStock);
 
-            cartItem.setQuantity(finalQty);
+                cartItem.setQuantity(finalQty);
+            }
 
         } else {
-            if (requestedQty > availableStock) {
-                finalQty = availableStock;
-            } else {
-                finalQty = requestedQty;
-            }
+            // CASE 3: New item
+            finalQty = Math.min(requestedQty, availableStock);
 
             cartItem = new CartItem();
             cartItem.setCart(cart);
             cartItem.setProductVariant(variant);
             cartItem.setQuantity(finalQty);
             cartItem.setPrice(variant.getPrice());
+            cartItem.setIsActive(true);
         }
 
+        // save
         cartItemRepository.save(cartItem);
 
-        // update cart time
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(cart);
 
-        // message handling
+        // message
         String message = (requestedQty > availableStock)
                 ? "Only " + availableStock + " items available"
                 : "Item added successfully";
@@ -179,6 +180,7 @@ public class CartService {
         );
     }
 
+    // Update item quantity in cart
     @Transactional
     public UpdateCartItemResponseDTO updateItem(Long userId, Long cartItemId, int quantity) {
 
@@ -236,6 +238,7 @@ public class CartService {
         );
     }
 
+    // Remove product from cart
     @Transactional
     public RemoveCartItemResponseDTO removeItem(Long userId, Long cartItemId) {
 
