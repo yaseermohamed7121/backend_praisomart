@@ -6,15 +6,16 @@ import com.praisomart.backend.auth.entity.User;
 import com.praisomart.backend.auth.repository.OtpVerificationRepository;
 import com.praisomart.backend.auth.repository.UserRepository;
 import com.praisomart.backend.auth.security.JwtUtil;
+import jakarta.transaction.Transactional;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
 @Service
 public class AuthService {
@@ -24,24 +25,27 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
+    private final EmailService emailService;
 
     public AuthService(UserRepository userRepository,
                        OtpVerificationRepository otpRepository,
                        PasswordEncoder passwordEncoder,
                        JwtUtil jwtUtil,
-                       AuthenticationManager authenticationManager) {
+                       AuthenticationManager authenticationManager,
+                       EmailService emailService) {
         this.userRepository = userRepository;
         this.otpRepository = otpRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil=jwtUtil;
         this.authenticationManager=authenticationManager;
+        this.emailService=emailService;
     }
 
     // ------------------------------------------------
     // Generate OTP
     // ------------------------------------------------
     private String generateOtp() {
-        Random random = new Random();
+        SecureRandom random = new SecureRandom();
         int otp = 100000 + random.nextInt(900000);
         return String.valueOf(otp);
     }
@@ -72,18 +76,32 @@ public class AuthService {
     // ------------------------------------------------
     // SEND OTP
     // ------------------------------------------------
-    public SendOtpResponseDTO sendOtp(String identifier){
+    @Transactional
+    public SendOtpResponseDTO sendOtp(String identifier) {
 
         String otpType;
 
-        if(identifier.matches("^[0-9]{10}$")){
+        if (identifier.matches("^[0-9]{10}$")) {
             otpType = "PHONE";
-        }
-        else if(identifier.contains("@")){
+        } else if (identifier.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
             otpType = "EMAIL";
+        } else {
+            throw new RuntimeException("Invalid identifier");
         }
-        else{
-            return new SendOtpResponseDTO("Invalid identifier");
+
+        Optional<OtpVerification> existingOtp =
+                otpRepository.findTopByIdentifierOrderByCreatedAtDesc(identifier);
+
+        // 🔥 30 sec rate limit
+        if (existingOtp.isPresent() &&
+                existingOtp.get().getCreatedAt().plusSeconds(30).isAfter(LocalDateTime.now())) {
+            throw new RuntimeException("Please wait 30 seconds before requesting OTP again");
+        }
+
+        // 🔥 Max resend limit
+        if (existingOtp.isPresent() &&
+                existingOtp.get().getResendCount() >= 5) {
+            throw new RuntimeException("Too many OTP requests. Try again later");
         }
 
         // delete old OTP
@@ -93,13 +111,19 @@ public class AuthService {
 
         OtpVerification otpEntity = new OtpVerification();
         otpEntity.setIdentifier(identifier);
-        otpEntity.setOtpCode(otp);
+        otpEntity.setOtpCode(passwordEncoder.encode(otp));
         otpEntity.setOtpType(otpType);
+
+        // increment resend count
+        otpEntity.setResendCount(
+                existingOtp.map(o -> o.getResendCount() + 1).orElse(1)
+        );
 
         otpRepository.save(otpEntity);
 
-        // TODO: integrate email / sms service
-        System.out.println("OTP for " + identifier + " : " + otp);
+        if (otpType.equals("EMAIL")) {
+            emailService.sendOtpEmail(identifier, otp);
+        }
 
         return new SendOtpResponseDTO("OTP sent successfully");
     }
@@ -107,25 +131,34 @@ public class AuthService {
     // ------------------------------------------------
     // VERIFY OTP
     // ------------------------------------------------
-    public OtpVerifyResponseDTO verifyOtp(String identifier, String otp){
+    @Transactional
+    public OtpVerifyResponseDTO verifyOtp(String identifier, String otp) {
 
-        Optional<OtpVerification> otpRecord =
-                otpRepository.findTopByIdentifierOrderByCreatedAtDesc(identifier);
+        OtpVerification otpVerification = otpRepository
+                .findTopByIdentifierOrderByCreatedAtDesc(identifier)
+                .orElseThrow(() -> new RuntimeException("OTP not found"));
 
-        if(otpRecord.isEmpty()){
-            return new OtpVerifyResponseDTO("OTP not found");
+        // 🔥 Attempt limit
+        if (otpVerification.getAttempts() >= 3) {
+            throw new RuntimeException("Too many attempts. Request new OTP");
         }
 
-        OtpVerification otpVerification = otpRecord.get();
-
-        if(otpVerification.getExpiryTime().isBefore(LocalDateTime.now())){
-            return new OtpVerifyResponseDTO("OTP expired");
+        // 🔥 Expiry check
+        if (otpVerification.getExpiryTime().isBefore(LocalDateTime.now())) {
+            otpRepository.save(otpVerification);
+            throw new RuntimeException("OTP expired");
         }
 
-        if(!otpVerification.getOtpCode().equals(otp)){
-            return new OtpVerifyResponseDTO("Invalid OTP");
+        // 🔥 OTP match
+        if (!passwordEncoder.matches(otp, otpVerification.getOtpCode())) {
+
+            // increment attempt
+            otpVerification.setAttempts(otpVerification.getAttempts() + 1);
+            otpRepository.save(otpVerification);
+            throw new RuntimeException("Invalid OTP");
         }
 
+        // ✅ Success
         otpVerification.setVerified(true);
         otpRepository.save(otpVerification);
 

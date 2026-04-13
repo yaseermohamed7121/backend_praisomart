@@ -1,8 +1,6 @@
 package com.praisomart.backend.auth.entity;
 
 import jakarta.persistence.*;
-
-
 import java.time.LocalDateTime;
 
 @Entity
@@ -25,11 +23,19 @@ public class OtpVerification {
 
     private boolean verified;
 
+    @Column(name = "attempts")
+    private int attempts;
+
+    @Column(name = "resend_count")
+    private int resendCount;
+
     @PrePersist
     protected void onCreate() {
-        this.createdAt=LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
         this.expiryTime = LocalDateTime.now().plusMinutes(5);
         this.verified = false;
+        this.attempts = 0;
+        this.resendCount = 0;
     }
 
     public OtpVerification() {
@@ -99,5 +105,21 @@ public class OtpVerification {
 
     public void setVerified(boolean verified) {
         this.verified = verified;
+    }
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
+    }
+
+    public int getResendCount() {
+        return resendCount;
+    }
+
+    public void setResendCount(int resendCount) {
+        this.resendCount = resendCount;
     }
 }
