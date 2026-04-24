@@ -13,7 +13,7 @@ public class ProductDetailResponse {
 
     // ✅ Constructor (correct order)
     public ProductDetailResponse(Long id, String name, String description,
-                                 String color, List<String> images,
+                                     String color, List<String> images,
                                  List<VariantResponse> variants) {
         this.id = id;
         this.name = name;

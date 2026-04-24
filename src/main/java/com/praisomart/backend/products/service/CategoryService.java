@@ -18,7 +18,7 @@ public class CategoryService {
     }
 
     public List<CategoryResponseDTO> getAllCategories() {
-        return categoryRepository.findByIsActiveTrue()
+        return categoryRepository.findByIsActiveTrueOrderByNameAsc()
                 .stream()
                 .map(c -> new CategoryResponseDTO(
                         c.getId(),

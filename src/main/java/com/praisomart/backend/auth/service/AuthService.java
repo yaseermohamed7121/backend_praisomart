@@ -1,21 +1,21 @@
 package com.praisomart.backend.auth.service;
 
 import com.praisomart.backend.auth.dto.*;
-import com.praisomart.backend.auth.entity.OtpVerification;
-import com.praisomart.backend.auth.entity.User;
-import com.praisomart.backend.auth.repository.OtpVerificationRepository;
-import com.praisomart.backend.auth.repository.UserRepository;
+import com.praisomart.backend.auth.entity.*;
+import com.praisomart.backend.auth.enums.*;
+import com.praisomart.backend.auth.repository.*;
 import com.praisomart.backend.auth.security.JwtUtil;
+import com.praisomart.backend.exception.*;
+
 import jakarta.transaction.Transactional;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.authentication.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class AuthService {
@@ -26,224 +26,184 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
     private final EmailService emailService;
+    private final SmsService smsService;
 
     public AuthService(UserRepository userRepository,
                        OtpVerificationRepository otpRepository,
                        PasswordEncoder passwordEncoder,
                        JwtUtil jwtUtil,
                        AuthenticationManager authenticationManager,
-                       EmailService emailService) {
+                       EmailService emailService,
+                       SmsService smsService) {
+
         this.userRepository = userRepository;
         this.otpRepository = otpRepository;
         this.passwordEncoder = passwordEncoder;
-        this.jwtUtil=jwtUtil;
-        this.authenticationManager=authenticationManager;
-        this.emailService=emailService;
+        this.jwtUtil = jwtUtil;
+        this.authenticationManager = authenticationManager;
+        this.emailService = emailService;
+        this.smsService = smsService;
     }
 
-    // ------------------------------------------------
-    // Generate OTP
-    // ------------------------------------------------
+    // ---------------- OTP ----------------
     private String generateOtp() {
-        SecureRandom random = new SecureRandom();
-        int otp = 100000 + random.nextInt(900000);
-        return String.valueOf(otp);
+        return String.valueOf(100000 + new SecureRandom().nextInt(900000));
     }
 
-    // ------------------------------------------------
-    // CHECK USER
-    // ------------------------------------------------
+    // ---------------- VALIDATION ----------------
+    private OtpChannel detectChannel(String identifier) {
+
+        String emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
+        String mobileRegex = "^[6-9][0-9]{9}$";
+
+        if (identifier.matches(emailRegex)) return OtpChannel.EMAIL;
+        if (identifier.matches(mobileRegex)) return OtpChannel.SMS;
+
+        throw new BadRequestException("Invalid identifier");
+    }
+
     public IdentifierResponseDTO checkUser(String identifier) {
 
-        Optional<User> user;
+        boolean exists = userRepository.findByEmail(identifier).isPresent()
+                || userRepository.findByPhoneNumber(identifier).isPresent();
 
-        if(identifier.matches("^[0-9]{10}$")){
-            user = userRepository.findByPhoneNumber(identifier);
-        }
-        else if(identifier.contains("@")){
-            user = userRepository.findByEmail(identifier);
-        }
-        else{
-            return new IdentifierResponseDTO(false,"Enter valid email or phone number");
-        }
-        if(user.isPresent()){
-            return new IdentifierResponseDTO(true,"login");
-        }
-
-        return new IdentifierResponseDTO(false,"register");
+        return new IdentifierResponseDTO(exists, "OK");
     }
 
-    // ------------------------------------------------
-    // SEND OTP
-    // ------------------------------------------------
+    // ---------------- SEND OTP ----------------
     @Transactional
-    public SendOtpResponseDTO sendOtp(String identifier) {
+    public SendOtpResponseDTO sendOtp(SendOtpRequestDTO request) {
 
-        String otpType;
+        String identifier = request.getIdentifier();
+        OtpPurpose purpose = request.getPurpose();
 
-        if (identifier.matches("^[0-9]{10}$")) {
-            otpType = "PHONE";
-        } else if (identifier.matches("^[A-Za-z0-9+_.-]+@(.+)$")) {
-            otpType = "EMAIL";
-        } else {
-            throw new RuntimeException("Invalid identifier");
+        OtpChannel channel = detectChannel(identifier);
+
+        var lastOtp = otpRepository
+                .findTopByIdentifierAndPurposeOrderByCreatedAtDesc(identifier, purpose);
+
+        if (lastOtp.isPresent()) {
+
+            if (lastOtp.get().getCreatedAt()
+                    .plusSeconds(30)
+                    .isAfter(LocalDateTime.now())) {
+                throw new BadRequestException("Wait 30 seconds before retry");
+            }
+
+            if (lastOtp.get().getResendCount() >= 5) {
+                throw new BadRequestException("Too many OTP requests");
+            }
         }
 
-        Optional<OtpVerification> existingOtp =
-                otpRepository.findTopByIdentifierOrderByCreatedAtDesc(identifier);
-
-        // 🔥 30 sec rate limit
-        if (existingOtp.isPresent() &&
-                existingOtp.get().getCreatedAt().plusSeconds(30).isAfter(LocalDateTime.now())) {
-            throw new RuntimeException("Please wait 30 seconds before requesting OTP again");
-        }
-
-        // 🔥 Max resend limit
-        if (existingOtp.isPresent() &&
-                existingOtp.get().getResendCount() >= 5) {
-            throw new RuntimeException("Too many OTP requests. Try again later");
-        }
-
-        // delete old OTP
-        otpRepository.deleteByIdentifier(identifier);
+        otpRepository.deleteByIdentifierAndPurpose(identifier, purpose);
 
         String otp = generateOtp();
 
-        OtpVerification otpEntity = new OtpVerification();
-        otpEntity.setIdentifier(identifier);
-        otpEntity.setOtpCode(passwordEncoder.encode(otp));
-        otpEntity.setOtpType(otpType);
+        OtpVerification entity = new OtpVerification();
+        entity.setIdentifier(identifier);
+        entity.setOtpCode(passwordEncoder.encode(otp));
+        entity.setChannel(channel);
+        entity.setPurpose(purpose);
+        entity.setResendCount(lastOtp.map(o -> o.getResendCount() + 1).orElse(1));
 
-        // increment resend count
-        otpEntity.setResendCount(
-                existingOtp.map(o -> o.getResendCount() + 1).orElse(1)
-        );
+        otpRepository.save(entity);
 
-        otpRepository.save(otpEntity);
-
-        if (otpType.equals("EMAIL")) {
-            emailService.sendOtpEmail(identifier, otp);
+        if (channel == OtpChannel.EMAIL) {
+            emailService.sendOtpEmail(identifier, otp, purpose.name());
+        } else {
+            smsService.sendOtpSms(identifier, otp, purpose.name());
         }
 
         return new SendOtpResponseDTO("OTP sent successfully");
     }
 
-    // ------------------------------------------------
-    // VERIFY OTP
-    // ------------------------------------------------
+    // ---------------- VERIFY OTP ----------------
     @Transactional
-    public OtpVerifyResponseDTO verifyOtp(String identifier, String otp) {
+    public OtpVerifyResponseDTO verifyOtp(String identifier, String otp, OtpPurpose purpose) {
 
-        OtpVerification otpVerification = otpRepository
-                .findTopByIdentifierOrderByCreatedAtDesc(identifier)
-                .orElseThrow(() -> new RuntimeException("OTP not found"));
+        OtpVerification entity =
+                otpRepository.findTopByIdentifierAndPurposeOrderByCreatedAtDesc(identifier, purpose)
+                        .orElseThrow(() -> new ResourceNotFoundException("OTP not found"));
 
-        // 🔥 Attempt limit
-        if (otpVerification.getAttempts() >= 3) {
-            throw new RuntimeException("Too many attempts. Request new OTP");
+        if (entity.getAttempts() >= 3) {
+            throw new BadRequestException("Too many attempts");
         }
 
-        // 🔥 Expiry check
-        if (otpVerification.getExpiryTime().isBefore(LocalDateTime.now())) {
-            otpRepository.save(otpVerification);
-            throw new RuntimeException("OTP expired");
+        if (entity.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("OTP expired");
         }
 
-        // 🔥 OTP match
-        if (!passwordEncoder.matches(otp, otpVerification.getOtpCode())) {
-
-            // increment attempt
-            otpVerification.setAttempts(otpVerification.getAttempts() + 1);
-            otpRepository.save(otpVerification);
-            throw new RuntimeException("Invalid OTP");
+        if (!passwordEncoder.matches(otp, entity.getOtpCode())) {
+            entity.setAttempts(entity.getAttempts() + 1);
+            otpRepository.save(entity);
+            throw new BadRequestException("Invalid OTP");
         }
 
-        // ✅ Success
-        otpVerification.setVerified(true);
-        otpRepository.save(otpVerification);
+        entity.setVerified(true);
+        otpRepository.save(entity);
 
-        return new OtpVerifyResponseDTO("OTP verified successfully");
+        otpRepository.deleteByIdentifierAndPurpose(identifier, purpose);
+
+        return new OtpVerifyResponseDTO("OTP verified");
     }
 
-    // ------------------------------------------------
-    // REGISTER USER
-    // ------------------------------------------------
-    public RegisterResponseDTO register(RegisterRequestDTO request){
+    // ---------------- REGISTER ----------------
+    @Transactional
+    public RegisterResponseDTO register(RegisterRequestDTO request) {
 
-        if(!request.getPassword().equals(request.getConfirmPassword())){
-            return new RegisterResponseDTO("Passwords do not match", null);
+        if (!request.getPassword().equals(request.getConfirmPassword())) {
+            throw new BadRequestException("Password mismatch");
         }
 
-        if(userRepository.findByEmail(request.getEmail()).isPresent()){
-            return new RegisterResponseDTO("Email already registered",null);
+        try {
+            User user = new User();
+            user.setName(request.getName());
+            user.setEmail(request.getEmail());
+            user.setPhoneNumber(request.getPhoneNumber());
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+
+            userRepository.save(user);
+
+        } catch (DataIntegrityViolationException e) {
+            throw new ConflictException("Email or Phone already exists");
         }
 
-        if(userRepository.findByPhoneNumber(request.getPhoneNumber()).isPresent()){
-            return new RegisterResponseDTO("Phone already registered",null);
-        }
+        User savedUser = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found after save"));
 
-        Optional<OtpVerification> emailOtp =
-                otpRepository.findTopByIdentifierOrderByCreatedAtDesc(request.getEmail());
-
-        Optional<OtpVerification> phoneOtp =
-                otpRepository.findTopByIdentifierOrderByCreatedAtDesc(request.getPhoneNumber());
-
-        if(emailOtp.isEmpty() || !emailOtp.get().isVerified()){
-            return new RegisterResponseDTO("Email not verified", null);
-        }
-
-        if(phoneOtp.isEmpty() || !phoneOtp.get().isVerified()){
-            return new RegisterResponseDTO("Phone not verified", null);
-        }
-
-        User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setPhoneNumber(request.getPhoneNumber());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-
-        userRepository.save(user);
-
-        // JWT generation will come here later
         String token = jwtUtil.generateToken(
-                user.getId(),
-                user.getEmail(),
-                List.of(user.getRole())
+                savedUser.getId(),
+                savedUser.getEmail(),
+                List.of(savedUser.getRole())
         );
 
-        return new RegisterResponseDTO("Registration successful", token);
+        return new RegisterResponseDTO("Success", token);
     }
 
-    // ------------------------------------------------
-    // LOGIN
-    // ------------------------------------------------
+    // ---------------- LOGIN ----------------
     public LoginResponseDTO login(LoginRequestDTO request) {
 
-        // Step 1: Find user (email OR phone)
         User user = userRepository.findByEmail(request.getIdentifier())
                 .or(() -> userRepository.findByPhoneNumber(request.getIdentifier()))
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Step 2: Authenticate
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        user.getEmail(),   // always email
-                        request.getPassword()
-                )
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            user.getEmail(),
+                            request.getPassword()
+                    )
+            );
+        } catch (BadCredentialsException e) {
+            throw new UnauthorizedException("Invalid credentials");
+        }
 
-        // Step 3: Generate JWT
         String token = jwtUtil.generateToken(
                 user.getId(),
                 user.getEmail(),
                 List.of(user.getRole())
         );
 
-        // Step 4: Response
-        return new LoginResponseDTO(
-                token,
-                "Login Successful"
-        );
+        return new LoginResponseDTO(token, "Login Success");
     }
-
 }

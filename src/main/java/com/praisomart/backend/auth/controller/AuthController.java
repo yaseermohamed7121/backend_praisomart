@@ -5,81 +5,52 @@ import com.praisomart.backend.auth.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
 
-    @Autowired
     private AuthService authService;
 
-    // Send OTP
+    public AuthController(AuthService authService){
+         this.authService=authService;
+    }
+
     @PostMapping("/check-user")
-    public ResponseEntity<IdentifierResponseDTO> userIdentification(
-            @Valid
+    public ResponseEntity<IdentifierResponseDTO> checkUser(
             @RequestBody IdentifierRequestDTO request) {
-
-        IdentifierResponseDTO response=authService.checkUser(request.getIdentifier());
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(authService.checkUser(request.getIdentifier()));
     }
 
-    // login
-    @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(
-            @RequestBody LoginRequestDTO request){
-
-        LoginResponseDTO response =
-                authService.login(request);
-
-        return ResponseEntity.ok(response);
-    }
-
-//    @PostMapping("/login")
-//    public String test() {
-//        return "Working";
-//    }
-
-    // register
-    @PostMapping("/register")
-    public ResponseEntity<RegisterResponseDTO> register(
-            @RequestBody RegisterRequestDTO request){
-
-        RegisterResponseDTO response =
-                authService.register(request);
-
-        return ResponseEntity.ok(response);
-    }
-
-    // send otp
     @PostMapping("/send-otp")
     public ResponseEntity<SendOtpResponseDTO> sendOtp(
-            @RequestBody SendOtpRequestDTO request){
-
-        SendOtpResponseDTO response =
-                authService.sendOtp(request.getIdentifier());
-
-        return ResponseEntity.ok(response);
+            @RequestBody SendOtpRequestDTO request) {
+        return ResponseEntity.ok(authService.sendOtp(request));
     }
 
-    // verify otp
     @PostMapping("/verify-otp")
     public ResponseEntity<OtpVerifyResponseDTO> verifyOtp(
-            @RequestBody OtpVerifyRequestDTO request){
+            @RequestBody OtpVerifyRequestDTO request) {
 
-        OtpVerifyResponseDTO response =
+        return ResponseEntity.ok(
                 authService.verifyOtp(
                         request.getIdentifier(),
-                        request.getOtp());
-
-        return ResponseEntity.ok(response);
+                        request.getOtp(),
+                        request.getPurpose()
+                )
+        );
     }
 
+    @PostMapping("/register")
+    public ResponseEntity<RegisterResponseDTO> register(
+            @RequestBody RegisterRequestDTO request) {
+        return ResponseEntity.ok(authService.register(request));
+    }
 
+    @PostMapping("/login")
+    public ResponseEntity<LoginResponseDTO> login(
+            @RequestBody LoginRequestDTO request) {
+        return ResponseEntity.ok(authService.login(request));
+    }
 }

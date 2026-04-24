@@ -16,10 +16,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name="name",nullable = false,length=100)
+    @Column(name="name",nullable = false,length=30)
     private String name;
 
-    @Column(name="email",unique = true ,length=150)
+    @Column(name="email", nullable = false,unique = true ,length=30)
     @Email(message="Invalid email format")
     private String email;
 
@@ -30,16 +30,16 @@ public class User {
     @Column(name="password",nullable = false,length=250)
     private String password;
 
-    @Column(name="created_at")
+    @Column(name="created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name="role")
+    @Column(name="role", nullable = false)
     private String role;
 
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
-        this.role="User";
+        this.role="USER";
     }
 
     public User(LocalDateTime createdAt, String email, Long id, String name, String password, String phoneNumber, String role) {

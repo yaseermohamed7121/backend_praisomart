@@ -12,6 +12,7 @@ import com.praisomart.backend.checkout.dto.CheckoutResponseDTO;
 import com.praisomart.backend.products.entity.ProductImage;
 import com.praisomart.backend.products.entity.ProductVariant;
 import com.praisomart.backend.products.repository.ProductVariantRepository;
+import com.praisomart.backend.exception.*;
 
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -38,15 +39,15 @@ public class CheckoutService {
         this.addressRepository = addressRepository;
     }
 
-    @Transactional // Read-only style transaction
+    @Transactional
     public CheckoutResponseDTO getCheckout(Long cartId, Long userId) {
 
         // 🔹 1. Validate Cart
         Cart cart = cartRepository.findById(cartId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cart not found"));
 
         if (!cart.getUserId().equals(userId)) {
-            throw new RuntimeException("Unauthorized cart access");
+            throw new UnauthorizedException("Unauthorized cart access");
         }
 
         // 🔹 2. Fetch Active Cart Items
@@ -54,7 +55,7 @@ public class CheckoutService {
                 cartItemRepository.findByCartIdAndIsActiveTrue(cartId);
 
         if (cartItems.isEmpty()) {
-            throw new RuntimeException("Cart is empty");
+            throw new BadRequestException("Cart is empty");
         }
 
         // 🔹 3. Process Items
@@ -65,16 +66,16 @@ public class CheckoutService {
 
             ProductVariant variant = variantRepository
                     .findById(item.getProductVariant().getId())
-                    .orElseThrow(() -> new RuntimeException("Product variant not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Product variant not found"));
 
             if (variant.getStock() == null || variant.getStock() <= 0) {
-                throw new RuntimeException(
+                throw new BadRequestException(
                         "Out of stock: " + variant.getProduct().getName()
                 );
             }
 
             if (item.getQuantity() > variant.getStock()) {
-                throw new RuntimeException(
+                throw new BadRequestException(
                         "Only " + variant.getStock() + " items available for "
                                 + variant.getProduct().getName()
                 );
@@ -83,7 +84,7 @@ public class CheckoutService {
             BigDecimal price = variant.getPrice();
 
             if (price == null) {
-                throw new RuntimeException("Price not available for product");
+                throw new BadRequestException("Price not available for product");
             }
 
             BigDecimal itemTotal =
@@ -91,7 +92,6 @@ public class CheckoutService {
 
             totalAmount = totalAmount.add(itemTotal);
 
-            // Image handling
             String imageUrl = getPrimaryImage(variant);
 
             CartItemResponseDTO dto = new CartItemResponseDTO(
@@ -108,7 +108,7 @@ public class CheckoutService {
             itemDTOs.add(dto);
         }
 
-        // 🔹 4. Fetch Addresses (NO exception → empty list allowed)
+        // 🔹 4. Fetch Addresses
         List<Address> addresses =
                 addressRepository.findByUserIdAndIsActiveTrueOrderByIsDefaultDesc(userId);
 
@@ -130,7 +130,6 @@ public class CheckoutService {
             addressDTOs.add(dto);
         }
 
-        // 🔹 5. Final Response
         return new CheckoutResponseDTO(
                 cartId,
                 itemDTOs,
@@ -139,7 +138,6 @@ public class CheckoutService {
         );
     }
 
-    // Helper method (clean code)
     private String getPrimaryImage(ProductVariant variant) {
         if (variant.getProduct().getImages() != null &&
                 !variant.getProduct().getImages().isEmpty()) {

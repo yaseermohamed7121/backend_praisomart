@@ -20,7 +20,7 @@ public class Product {
 
     private String description;
 
-    @Column(nullable = false)
+    @Column(name = "color",nullable = false)
     private String color;
 
     private Boolean isActive = true;

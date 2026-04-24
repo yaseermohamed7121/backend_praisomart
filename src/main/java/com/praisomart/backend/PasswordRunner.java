@@ -12,7 +12,7 @@
 //    public CommandLineRunner generatePassword() {
 //        return args -> {
 //            BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-//            String encoded = encoder.encode("123");
+//            String encoded = encoder.encode("praisomart#@19");
 //            System.out.println("Encoded password: " + encoded);
 //        };
 //    }

@@ -6,17 +6,20 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(name = "product_variants",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "size"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"product_id", "attribute"}))
 public class ProductVariant {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String size;
+    @Column(nullable = false)
+    private String attribute;
 
+    @Column(nullable = false)
     private BigDecimal price;
 
+    @Column(nullable = false)
     private Integer stock = 0;
 
     private String sku;
@@ -30,11 +33,11 @@ public class ProductVariant {
     // Constructor
     public ProductVariant() {}
 
-    public ProductVariant(Long id, String size, BigDecimal price,
+    public ProductVariant(Long id, String attribute, BigDecimal price,
                           Integer stock, String sku, Boolean isActive,
                           Product product) {
         this.id = id;
-        this.size = size;
+        this.attribute = attribute;
         this.price = price;
         this.stock = stock;
         this.sku = sku;
@@ -46,8 +49,13 @@ public class ProductVariant {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
-    public String getSize() { return size; }
-    public void setSize(String size) { this.size = size; }
+    public String getAttribute() {
+        return attribute;
+    }
+
+    public void setAttribute(String attribute) {
+        this.attribute = attribute;
+    }
 
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }

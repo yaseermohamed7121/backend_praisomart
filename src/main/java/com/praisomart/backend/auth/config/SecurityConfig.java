@@ -55,6 +55,10 @@ public class SecurityConfig {
                         .requestMatchers("/auth/**", "/health", "/actuator/**").permitAll()
                         .requestMatchers("/api/categories/**").permitAll()
                         .requestMatchers("/api/products/**").permitAll()
+
+                        //  ADMIN ONLY
+                        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

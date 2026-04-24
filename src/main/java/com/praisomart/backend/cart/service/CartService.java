@@ -9,6 +9,8 @@ import com.praisomart.backend.products.entity.Product;
 import com.praisomart.backend.products.entity.ProductImage;
 import com.praisomart.backend.products.entity.ProductVariant;
 import com.praisomart.backend.products.repository.ProductVariantRepository;
+import com.praisomart.backend.exception.*;
+
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
@@ -44,7 +46,7 @@ public class CartService {
         }
 
         List<CartItemResponseDTO> itemDTOList = new ArrayList<>();
-        BigDecimal totalAmount = BigDecimal.ZERO.setScale(2);;
+        BigDecimal totalAmount = BigDecimal.ZERO.setScale(2);
         int totalItems = 0;
 
         if (cart.getItems() == null) {
@@ -81,13 +83,12 @@ public class CartService {
                 if (imageUrl == null) {
                     for (ProductImage img : images) {
                         imageUrl = img.getImageUrl();
-                        break; // take first image
+                        break;
                     }
                 }
             }
 
             dto.setImageUrl(imageUrl);
-
             dto.setQuantity(item.getQuantity());
             dto.setPrice(item.getPrice());
 
@@ -115,18 +116,15 @@ public class CartService {
     @Transactional
     public AddCartItemResponseDTO addItem(Long userId, AddCartItemRequestDTO dto) {
 
-        // 1. Get or create cart
         Cart cart = cartRepository.findByUserIdAndIsActiveTrue(userId)
                 .orElseGet(() -> cartRepository.save(new Cart(userId)));
 
-        // 2. Get product variant
         ProductVariant variant = productVariantRepository.findById(dto.getProductVariantId())
-                .orElseThrow(() -> new RuntimeException("Product variant not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Product variant not found"));
 
         int requestedQty = dto.getQuantity();
         int availableStock = variant.getStock();
 
-        // 3. Find item (IMPORTANT: no isActive filter)
         CartItem cartItem = cartItemRepository
                 .findByCartIdAndProductVariantId(cart.getId(), dto.getProductVariantId())
                 .orElse(null);
@@ -135,7 +133,6 @@ public class CartService {
 
         if (cartItem != null) {
 
-            // CASE 1: Item was deleted earlier → Reactivate
             if (!cartItem.getIsActive()) {
                 cartItem.setIsActive(true);
 
@@ -143,7 +140,6 @@ public class CartService {
                 cartItem.setQuantity(finalQty);
 
             } else {
-                // CASE 2: Already exists → Increase quantity
                 int newQty = cartItem.getQuantity() + requestedQty;
                 finalQty = Math.min(newQty, availableStock);
 
@@ -151,7 +147,6 @@ public class CartService {
             }
 
         } else {
-            // CASE 3: New item
             finalQty = Math.min(requestedQty, availableStock);
 
             cartItem = new CartItem();
@@ -162,13 +157,11 @@ public class CartService {
             cartItem.setIsActive(true);
         }
 
-        // save
         cartItemRepository.save(cartItem);
 
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(cart);
 
-        // message
         String message = (requestedQty > availableStock)
                 ? "Only " + availableStock + " items available"
                 : "Item added successfully";
@@ -184,24 +177,20 @@ public class CartService {
     @Transactional
     public UpdateCartItemResponseDTO updateItem(Long userId, Long cartItemId, int quantity) {
 
-        // Get cart
         Cart cart = cartRepository.findByUserIdAndIsActiveTrue(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cart not found"));
 
-        // Get item
         CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
 
-        // SECURITY CHECK (CRITICAL)
         if (!cartItem.getCart().getId().equals(cart.getId())) {
-            throw new RuntimeException("Unauthorized access");
+            throw new UnauthorizedException("Unauthorized access");
         }
 
         if (!cartItem.getIsActive()) {
-            throw new RuntimeException("Cart item is inactive");
+            throw new BadRequestException("Cart item is inactive");
         }
 
-        //  STOCK CHECK
         ProductVariant variant = cartItem.getProductVariant();
         int availableStock = variant.getStock();
 
@@ -213,19 +202,15 @@ public class CartService {
             finalQty = quantity;
         }
 
-        // Update quantity
         cartItem.setQuantity(finalQty);
         cartItemRepository.save(cartItem);
 
-        // Calculate total
         BigDecimal itemTotal =
                 cartItem.getPrice().multiply(BigDecimal.valueOf(finalQty));
 
-        // Update cart timestamp
         cart.setUpdatedAt(LocalDateTime.now());
         cartRepository.save(cart);
 
-        // Message
         String message = (quantity > availableStock)
                 ? "Only " + availableStock + " items available"
                 : "Cart item updated successfully";
@@ -243,20 +228,19 @@ public class CartService {
     public RemoveCartItemResponseDTO removeItem(Long userId, Long cartItemId) {
 
         Cart cart = cartRepository.findByUserIdAndIsActiveTrue(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cart not found"));
 
         CartItem cartItem = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
 
         if (!cartItem.getCart().getId().equals(cart.getId())) {
-            throw new RuntimeException("Unauthorized access");
+            throw new UnauthorizedException("Unauthorized access");
         }
 
         if (!cartItem.getIsActive()) {
-            throw new RuntimeException("Cart item already removed");
+            throw new BadRequestException("Cart item already removed");
         }
 
-        // soft delete
         cartItem.setIsActive(false);
         cartItemRepository.save(cartItem);
 

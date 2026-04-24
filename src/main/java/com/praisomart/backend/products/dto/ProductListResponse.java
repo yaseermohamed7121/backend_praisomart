@@ -10,6 +10,7 @@ public class ProductListResponse {
     private Double price;
     private Boolean inStock;
 
+
     // ✅ Constructor (correct order)
     public ProductListResponse(Long id, String name, String color,
                                String image, Double price, Boolean inStock) {
@@ -42,4 +43,6 @@ public class ProductListResponse {
 
     public Boolean getInStock() { return inStock; }
     public void setInStock(Boolean inStock) { this.inStock = inStock; }
+
+
 }

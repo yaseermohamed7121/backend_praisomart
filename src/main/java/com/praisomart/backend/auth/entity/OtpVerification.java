@@ -1,5 +1,7 @@
 package com.praisomart.backend.auth.entity;
 
+import com.praisomart.backend.auth.enums.OtpChannel;
+import com.praisomart.backend.auth.enums.OtpPurpose;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
@@ -15,7 +17,11 @@ public class OtpVerification {
 
     private String otpCode;     // 6-digit OTP
 
-    private String otpType;     // EMAIL or PHONE
+    @Enumerated(EnumType.STRING)
+    private OtpChannel channel;
+
+    @Enumerated(EnumType.STRING)
+    private OtpPurpose purpose;     // EMAIL or PHONE
 
     private LocalDateTime createdAt;
 
@@ -42,13 +48,27 @@ public class OtpVerification {
     }
 
     public OtpVerification(LocalDateTime createdAt, LocalDateTime expiryTime, Long id, String identifier, String otpCode, String otpType, boolean verified) {
-        this.createdAt = createdAt;
-        this.expiryTime = expiryTime;
-        this.id = id;
-        this.identifier = identifier;
-        this.otpCode = otpCode;
-        this.otpType = otpType;
-        this.verified = verified;
+        this.createdAt = LocalDateTime.now();;
+        this.expiryTime = LocalDateTime.now().plusMinutes(5);
+        this.verified = false;
+        this.attempts = 0;
+        this.resendCount = 0;
+    }
+
+    public int getAttempts() {
+        return attempts;
+    }
+
+    public void setAttempts(int attempts) {
+        this.attempts = attempts;
+    }
+
+    public OtpChannel getChannel() {
+        return channel;
+    }
+
+    public void setChannel(OtpChannel channel) {
+        this.channel = channel;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -91,28 +111,12 @@ public class OtpVerification {
         this.otpCode = otpCode;
     }
 
-    public String getOtpType() {
-        return otpType;
+    public OtpPurpose getPurpose() {
+        return purpose;
     }
 
-    public void setOtpType(String otpType) {
-        this.otpType = otpType;
-    }
-
-    public boolean isVerified() {
-        return verified;
-    }
-
-    public void setVerified(boolean verified) {
-        this.verified = verified;
-    }
-
-    public int getAttempts() {
-        return attempts;
-    }
-
-    public void setAttempts(int attempts) {
-        this.attempts = attempts;
+    public void setPurpose(OtpPurpose purpose) {
+        this.purpose = purpose;
     }
 
     public int getResendCount() {
@@ -121,5 +125,13 @@ public class OtpVerification {
 
     public void setResendCount(int resendCount) {
         this.resendCount = resendCount;
+    }
+
+    public boolean isVerified() {
+        return verified;
+    }
+
+    public void setVerified(boolean verified) {
+        this.verified = verified;
     }
 }

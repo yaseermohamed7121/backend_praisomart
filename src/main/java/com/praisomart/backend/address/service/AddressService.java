@@ -5,6 +5,9 @@ import com.praisomart.backend.address.dto.AddressResponseDTO;
 import com.praisomart.backend.address.dto.UpdateAddressRequestDTO;
 import com.praisomart.backend.address.entity.Address;
 import com.praisomart.backend.address.repository.AddressRepository;
+import com.praisomart.backend.exception.BadRequestException;
+import com.praisomart.backend.exception.ResourceNotFoundException;
+import com.praisomart.backend.exception.UnauthorizedException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -25,7 +28,7 @@ public class AddressService {
     public AddressResponseDTO addAddress(Long userId, AddAddressRequestDTO dto) {
 
         if (userId == null) {
-            throw new RuntimeException("Invalid user");
+            throw new BadRequestException("Invalid user");
         }
 
         List<Address> addressList =
@@ -94,14 +97,14 @@ public class AddressService {
     public Address validateAddress(Long userId, Long addressId) {
 
         Address address = addressRepository.findById(addressId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
         if (!address.getUserId().equals(userId)) {
-            throw new RuntimeException("Unauthorized address");
+            throw new UnauthorizedException("Unauthorized address");
         }
 
         if (!address.getIsActive()) {
-            throw new RuntimeException("Address inactive");
+            throw new BadRequestException("Address inactive");
         }
 
         return address;
@@ -129,7 +132,7 @@ public class AddressService {
     public AddressResponseDTO updateAddress(Long userId, Long addressId, UpdateAddressRequestDTO dto) {
 
         if (userId == null) {
-            throw new RuntimeException("Invalid user");
+            throw new BadRequestException("Invalid user");
         }
 
         // ✅ Validate ownership + active
