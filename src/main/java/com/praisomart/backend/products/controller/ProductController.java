@@ -46,4 +46,27 @@ public class ProductController {
     public ResponseEntity<ProductDetailResponse> getProductDetail(@PathVariable Long id) {
         return ResponseEntity.ok(productService.getProductDetail(id));
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<ProductListResponse>>
+    searchProducts(
+
+            @RequestParam String keyword,
+
+            @RequestParam(defaultValue = "0")
+            int page,
+
+            @RequestParam(defaultValue = "10")
+            int size
+    ) {
+
+        return ResponseEntity.ok(
+                productService.searchProducts(
+                        keyword,
+                        page,
+                        size
+                )
+        );
+    }
+
 }

@@ -13,10 +13,24 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    @Query("""
+//    @Query("""
+//SELECT p FROM Product p
+//LEFT JOIN p.variants v
+//WHERE p.isActive = true
+//AND (:categoryId IS NULL OR p.category.id = :categoryId)
+//AND (:color IS NULL OR p.color = :color)
+//AND (:size IS NULL OR v.attribute = :size)
+//GROUP BY p
+//ORDER BY
+//    CASE WHEN :sort = 'price_low' THEN MIN(v.price) END ASC,
+//    CASE WHEN :sort = 'price_high' THEN MAX(v.price) END DESC,
+//    p.id DESC
+//""")
+@Query("""
 SELECT p FROM Product p
 LEFT JOIN p.variants v
 WHERE p.isActive = true
+AND v.isActive = true
 AND (:categoryId IS NULL OR p.category.id = :categoryId)
 AND (:color IS NULL OR p.color = :color)
 AND (:size IS NULL OR v.attribute = :size)
@@ -83,6 +97,47 @@ ORDER BY
             @Param("color") String color,
             Pageable pageable
     );
+
+    @Query("""
+SELECT DISTINCT p
+FROM Product p
+LEFT JOIN p.variants v
+WHERE p.isActive = true
+AND (
+      v IS NULL
+      OR v.isActive = true
+)
+AND (
+    LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+    OR LOWER(p.color) LIKE LOWER(CONCAT('%', :keyword, '%'))
+    OR LOWER(p.category.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+)
+ORDER BY p.id DESC
+""")
+    Page<Product> searchProducts(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
+//    @Query("""
+//SELECT p
+//FROM Product p
+//JOIN p.variants v
+//WHERE p.isActive = true
+//AND v.isActive = true
+//AND (
+//    p.name LIKE CONCAT('%', :keyword, '%')
+//    OR p.color LIKE CONCAT('%', :keyword, '%')
+//    OR p.category.name LIKE CONCAT('%', :keyword, '%')
+//)
+//GROUP BY p
+//ORDER BY p.id DESC
+//""")
+//    Page<Product> searchProducts(
+//            @Param("keyword") String keyword,
+//            Pageable pageable
+//    );
+
 }
 
 //@Repository

@@ -1,5 +1,6 @@
 package com.praisomart.backend.products.service;
 
+import com.praisomart.backend.exception.BadRequestException;
 import com.praisomart.backend.exception.ResourceNotFoundException;
 import com.praisomart.backend.products.dto.*;
 import com.praisomart.backend.products.entity.Product;
@@ -137,6 +138,54 @@ public class ProductService {
                 .orElse(
                         p.getImages().iterator().next().getImageUrl()
                 );
+    }
+
+    public Page<ProductListResponse> searchProducts(
+            String keyword,
+            int page,
+            int sizePage
+    ) {
+
+        if (keyword == null || keyword.isBlank()) {
+            throw new BadRequestException(
+                    "Keyword is required"
+            );
+        }
+
+        keyword = keyword.trim().toLowerCase();
+
+        Pageable pageable =
+                PageRequest.of(page, sizePage);
+
+        Page<Product> pageResult =
+                productRepository.searchProducts(
+                        keyword,
+                        pageable
+                );
+
+        List<ProductListResponse> responseList =
+                new ArrayList<>();
+
+        for (Product p : pageResult.getContent()) {
+
+            ProductListResponse dto =
+                    new ProductListResponse(
+                            p.getId(),
+                            p.getName(),
+                            p.getColor(),
+                            getPrimaryImage(p),
+                            getMinPrice(p),
+                            isInStock(p)
+                    );
+
+            responseList.add(dto);
+        }
+
+        return new PageImpl<>(
+                responseList,
+                pageable,
+                pageResult.getTotalElements()
+        );
     }
 }
 

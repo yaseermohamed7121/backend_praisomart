@@ -3,6 +3,7 @@ package com.praisomart.backend.adminPanel.service;
 import com.praisomart.backend.adminPanel.dto.ProductImageDTO;
 import com.praisomart.backend.adminPanel.dto.ProductRequestDTO;
 import com.praisomart.backend.adminPanel.dto.ProductVariantDTO;
+import com.praisomart.backend.adminPanel.dto.ProductAdminResponseDTO;
 import com.praisomart.backend.exception.BadRequestException;
 import com.praisomart.backend.exception.ResourceNotFoundException;
 import com.praisomart.backend.products.entity.Category;
@@ -131,5 +132,95 @@ public class ProductServiceAdmin {
         Product saved = productRepository.save(product);
 
         return saved.getId();
+    }
+
+    public void deleteProduct(Long id) {
+
+        Product product = productRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Product not found"));
+
+        product.setActive(false);
+
+        productRepository.save(product);
+    }
+
+    public ProductAdminResponseDTO getProductById(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        ProductAdminResponseDTO response = new ProductAdminResponseDTO();
+        response.setId(product.getId());
+        response.setName(product.getName());
+        response.setDescription(product.getDescription());
+        response.setColor(product.getColor());
+        response.setCategoryId(product.getCategory().getId());
+
+        response.setVariants(product.getVariants().stream().map(v -> {
+            ProductVariantDTO dto = new ProductVariantDTO();
+            dto.setAttribute(v.getAttribute());
+            dto.setPrice(v.getPrice());
+            dto.setStock(v.getStock());
+            return dto;
+        }).toList());
+
+        response.setImages(product.getImages().stream().map(i -> {
+            ProductImageDTO dto = new ProductImageDTO();
+            dto.setImageUrl(i.getImageUrl());
+            dto.setIsPrimary(i.getPrimary());
+            dto.setDisplayOrder(i.getDisplayOrder());
+            return dto;
+        }).toList());
+
+        return response;
+    }
+
+    public void updateProduct(Long id, ProductRequestDTO request) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+
+        product.setName(request.getName().trim());
+        product.setDescription(request.getDescription());
+        product.setColor(request.getColor());
+        product.setCategory(category);
+
+        // Update Variants (for simplicity, we replace them or update existing ones)
+        // In a real app, you'd match by ID, but here we'll clear and add new ones if provided
+        if (request.getVariants() != null && !request.getVariants().isEmpty()) {
+            product.getVariants().clear();
+            for (ProductVariantDTO v : request.getVariants()) {
+                ProductVariant variant = new ProductVariant();
+                variant.setAttribute(v.getAttribute() != null ? v.getAttribute().trim() : "DEFAULT");
+                variant.setPrice(v.getPrice());
+                variant.setStock(v.getStock() != null ? v.getStock() : 0);
+                variant.setProduct(product);
+                variant.setIsActive(true);
+                // SKU update logic could go here
+                product.getVariants().add(variant);
+            }
+        }
+
+        // Update Images (specifically for Cover Image)
+        if (request.getImages() != null) {
+            product.getImages().clear();
+            boolean hasPrimary = false;
+            for (ProductImageDTO i : request.getImages()) {
+                if (i.getImageUrl() == null || i.getImageUrl().isBlank()) continue;
+                ProductImage image = new ProductImage();
+                image.setImageUrl(i.getImageUrl().trim());
+                image.setPrimary(i.getIsPrimary() != null && i.getIsPrimary());
+                image.setProduct(product);
+                if (Boolean.TRUE.equals(i.getIsPrimary())) hasPrimary = true;
+                product.getImages().add(image);
+            }
+            if (!product.getImages().isEmpty() && !hasPrimary) {
+                product.getImages().iterator().next().setPrimary(true);
+            }
+        }
+
+        productRepository.save(product);
     }
 }
