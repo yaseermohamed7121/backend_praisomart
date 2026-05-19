@@ -1,14 +1,15 @@
 package com.praisomart.backend.adminPanel.controller;
 
+import com.praisomart.backend.adminPanel.dto.OrderStatusUpdateRequestDTO;
+import com.praisomart.backend.adminPanel.dto.OrderStatusUpdateResponseDTO;
 import com.praisomart.backend.adminPanel.service.AdminDashboardService;
 import com.praisomart.backend.orders.entity.Order;
 import com.praisomart.backend.orders.repository.OrderRepository;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -33,5 +34,15 @@ public class AdminDashboardController {
     public ResponseEntity<List<Order>> getRecentOrders() {
         // Return latest 10 orders
         return ResponseEntity.ok(orderRepository.findAll());
+    }
+
+    @PatchMapping("/{orderId}/status")
+    public ResponseEntity<OrderStatusUpdateResponseDTO> updateStatus(
+            @PathVariable Long orderId,
+            @Valid @RequestBody OrderStatusUpdateRequestDTO request) {
+
+        return ResponseEntity.ok(
+                dashboardService.updateOrderStatus(orderId, request)
+        );
     }
 }
